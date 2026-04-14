@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>名字抽选器</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+        <div class="bg-dot"></div>
+        <div class="bg-dot"></div>
+        <div class="bg-dot"></div>
+        <div class="bg-dot"></div>
+        <div class="bg-dot"></div>
+        <div class="bg-star">✦</div>
+        <div class="bg-star">✦</div>
+        <div class="bg-star">✦</div>
+    </div>
+
+    <div class="container">
+        <!-- 标题区域 -->
+        <header class="header">
+            <h1 class="title">
+                <span class="title-icon">🎯</span>
+                名字抽选器
+                <span class="title-icon">🎯</span>
+            </h1>
+            <p class="subtitle">让运气来决定吧！</p>
+            <a href="future/index.html" class="btn btn-future" target="_blank">
+                <i class="fas fa-rocket"></i> Future 3D抽人
+            </a>
+        </header>
+
+        <!-- 主要内容区 -->
+        <main class="main-content">
+            <!-- 左侧：名单管理 -->
+            <section class="panel name-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-users"></i> 名单管理</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="import-section">
+                        <label for="fileInput" class="btn btn-primary">
+                            <i class="fas fa-file-excel"></i> 导入Excel
+                        </label>
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+                        <span class="file-name" id="fileName">未选择文件</span>
+                    </div>
+                    <div class="name-count">
+                        当前人数：<span id="nameCount">0</span> 人
+                    </div>
+                    <div class="name-list" id="nameList">
+                        <div class="empty-tip">请导入Excel文件</div>
+                    </div>
+                    <div class="panel-footer">
+                        <button class="btn btn-danger" id="clearNames">
+                            <i class="fas fa-trash"></i> 清空名单
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 中间：抽取区域 -->
+            <section class="panel draw-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-hand-pointer"></i> 抽取设置</h2>
+                </div>
+                <div class="panel-body">
+                    <!-- 模式切换 -->
+                    <div class="mode-switch">
+                        <button class="mode-btn active" data-mode="scroll">
+                            <i class="fas fa-list"></i> 滚动抽取
+                        </button>
+                        <button class="mode-btn" data-mode="wheel">
+                            <i class="fas fa-circle-notch"></i> 大转盘
+                        </button>
+                    </div>
+
+                    <!-- 人数选择 -->
+                    <div class="count-section">
+                        <label>抽取人数：</label>
+                        <div class="count-options">
+                            <button class="count-btn active" data-count="1">1人</button>
+                            <button class="count-btn" data-count="2">2人</button>
+                            <button class="count-btn" data-count="custom">
+                                <i class="fas fa-cog"></i> 自定义
+                            </button>
+                        </div>
+                        <div class="custom-count hidden" id="customCountSection">
+                            <input type="number" id="customCount" min="1" max="10" value="3">
+                            <span>人 (最多10人)</span>
+                        </div>
+                    </div>
+
+                    <!-- 去除重复开关 -->
+                    <div class="option-row">
+                        <label class="switch-label">
+                            <span>去除重复抽取</span>
+                            <label class="switch">
+                                <input type="checkbox" id="noRepeat">
+                                <span class="slider"></span>
+                            </label>
+                        </label>
+                    </div>
+
+                    <!-- 抽取按钮 -->
+                    <button class="btn btn-draw" id="drawBtn">
+                        <i class="fas fa-play"></i> 开始抽取
+                    </button>
+                </div>
+            </section>
+
+            <!-- 右侧：历史记录 -->
+            <section class="panel history-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-history"></i> 抽取历史</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="history-list" id="historyList">
+                        <div class="empty-tip">暂无抽取记录</div>
+                    </div>
+                    <div class="panel-footer">
+                        <button class="btn btn-secondary" id="clearHistory">
+                            <i class="fas fa-trash"></i> 清除历史
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 结果展示弹窗 -->
+    <div class="result-overlay hidden" id="resultOverlay">
+        <div class="result-content" id="resultContent">
+            <div class="result-title">🎉 恭喜以下同学！ 🎉</div>
+            <div class="result-names" id="resultNames"></div>
+            <button class="btn btn-primary" id="closeResult">
+                <i class="fas fa-check"></i> 确定
+            </button>
+        </div>
+    </div>
+
+    <!-- 特效容器 -->
+    <div class="effects-container" id="effectsContainer"></div>
+
+    <!-- 音效元素 -->
+    <audio id="spinSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+    <audio id="successSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

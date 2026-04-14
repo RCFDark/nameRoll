@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Future 3D抽人</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: linear-gradient(to bottom, #131313 0%, #02101c 100%);
+            font-family: 'Segoe UI', Helvetica, sans-serif;
+        }
+
+        #container {
+            z-index: 3;
+            position: relative;
+            margin: 0 15vh;
+        }
+
+        #menu {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .canvas-box {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: -1;
+        }
+
+        #prizeBar {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            z-index: 5;
+            color: #03e9f4;
+        }
+
+        .prize-info {
+            background: rgba(0, 127, 127, 0.3);
+            border: 1px solid rgba(3, 233, 244, 0.3);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .prize-info h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #03e9f4;
+        }
+
+        .prize-info p {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin: 5px 0;
+        }
+
+        .count-select {
+            background: rgba(0, 127, 127, 0.3);
+            border: 1px solid rgba(3, 233, 244, 0.3);
+            color: #03e9f4;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .count-select option {
+            background: #02101c;
+            color: #03e9f4;
+        }
+
+        button {
+            color: #03e9f4;
+            background: transparent;
+            outline: 1px solid #03e9f4;
+            border: 0;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: rgba(3, 233, 244, 0.3);
+        }
+
+        button:active {
+            color: #000;
+            background-color: rgba(3, 233, 244, 0.8);
+        }
+
+        #lotteryBtn {
+            animation: breath 1.6s linear infinite;
+            box-shadow: 0 0 15px rgba(3, 233, 244, 0.5);
+        }
+
+        @keyframes breath {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .element {
+            width: 120px;
+            height: 150px;
+            background: rgba(0, 127, 127, 0.6);
+            box-shadow: 0 0 10px rgba(3, 233, 244, 0.3);
+            border: 1px solid rgba(3, 233, 244, 0.2);
+            text-align: center;
+            cursor: default;
+            transition: background-color 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .element .name {
+            font-size: 22px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 0 8px rgba(3, 233, 244, 0.8);
+        }
+
+        .highlight {
+            background-color: rgba(253, 105, 0, 0.9) !important;
+            box-shadow: 0 0 15px rgba(253, 105, 0, 0.8);
+            border: 1px solid rgba(253, 105, 0, 0.5);
+        }
+
+        .prize.element {
+            background-color: rgba(253, 105, 0, 0.85) !important;
+            box-shadow: 0 0 15px rgba(253, 105, 0, 0.9);
+        }
+
+        .qipao-container {
+            position: fixed;
+            right: 20px;
+            top: 100px;
+            width: 280px;
+            z-index: 10;
+        }
+
+        .qipao {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            font-size: 14px;
+            background-color: rgba(3, 233, 244, 0.2);
+            border: 1px solid rgba(3, 233, 244, 0.3);
+            color: #03e9f4;
+            border-radius: 5px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+
+        .used-count {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .none {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="canvas-box">
+        <canvas id="canvas">你的浏览器不支持canvas</canvas>
+    </div>
+
+    <div id="prizeBar">
+        <div class="prize-info">
+            <h3>🎲 Future 抽人</h3>
+            <p>剩余人数: <span id="leftCount">0</span></p>
+            <p>已抽取: <span id="usedCount">0</span></p>
+        </div>
+    </div>
+
+    <div id="container"></div>
+
+    <div id="menu">
+        <select class="count-select" id="countSelect">
+            <option value="1">抽取 1 人</option>
+            <option value="2">抽取 2 人</option>
+            <option value="3">抽取 3 人</option>
+            <option value="4">抽取 4 人</option>
+            <option value="5">抽取 5 人</option>
+            <option value="6">抽取 6 人</option>
+            <option value="7">抽取 7 人</option>
+            <option value="8">抽取 8 人</option>
+            <option value="9">抽取 9 人</option>
+            <option value="10">抽取 10 人</option>
+        </select>
+        <button id="lotteryBtn">开始抽奖</button>
+    </div>
+
+    <a href="../index.html" class="back-btn">
+        ← 返回主页
+    </a>
+
+    <div class="qipao-container"></div>
+
+    <script src="libs/three.min.js"></script>
+    <script src="libs/tween.min.js"></script>
+    <script src="libs/TrackballControls.js"></script>
+    <script src="libs/CSS3DRenderer.js"></script>
+    <script src="libs/canvas.js"></script>
+
+    <script>
+        const ROW_COUNT = 7;
+        const COLUMN_COUNT = 17;
+        const STORAGE_KEY_NAMES = 'nameRoll_names';
+        const STORAGE_KEY_USED = 'nameRoll_usedNames';
+        const ROTATE_TIME = 3000;
+
+        let TOTAL_CARDS;
+        let camera, scene, renderer, controls;
+        let threeDCards = [];
+        let targets = { table: [], sphere: [] };
+        let rotateObj;
+        let isLotting = false;
+        let currentLuckys = [];
+        let selectedCardIndex = [];
+        let basicData = {
+            users: [],
+            leftUsers: [],
+            usedNames: []
+        };
+
+        const btns = {
+            lottery: document.querySelector("#lotteryBtn"),
+            countSelect: document.querySelector("#countSelect")
+        };
+
+        initAll();
+
+        function initAll() {
+            loadFromStorage();
+            
+            if (basicData.users.length === 0) {
+                addQipao('⚠️ 请先在主页导入名单！');
+                return;
+            }
+
+            updateCountDisplay();
+            initCards();
+            animate();
+            shineCard();
+        }
+
+        function loadFromStorage() {
+            try {
+                const names = localStorage.getItem(STORAGE_KEY_NAMES);
+                const usedNames = localStorage.getItem(STORAGE_KEY_USED);
+                
+                if (names) {
+                    basicData.users = JSON.parse(names);
+                }
+                if (usedNames) {
+                    basicData.usedNames = JSON.parse(usedNames);
+                }
+                basicData.leftUsers = basicData.users.filter(name => !basicData.usedNames.includes(name));
+            } catch (e) {
+                console.error('加载数据失败:', e);
+            }
+        }
+
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY_USED, JSON.stringify(basicData.usedNames));
+            } catch (e) {
+                console.error('保存数据失败:', e);
+            }
+        }
+
+        function updateCountDisplay() {
+            document.getElementById('leftCount').textContent = basicData.leftUsers.length;
+            document.getElementById('usedCount').textContent = basicData.usedNames.length;
+        }
+
+        function initCards() {
+            const member = basicData.leftUsers.slice();
+            const length = member.length;
+            
+            if (length === 0) {
+                addQipao('⚠️ 所有人均已抽取！请返回主页清除历史');
+                return;
+            }
+
+            const totalMember = member.length;
+            const position = {
+                x: (140 * COLUMN_COUNT - 20) / 2,
+                y: (180 * ROW_COUNT - 20) / 2
+            };
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 3000;
+
+            scene = new THREE.Scene();
+
+            let index = 0;
+            for (let i = 0; i < ROW_COUNT; i++) {
+                for (let j = 0; j < COLUMN_COUNT; j++) {
+                    if (index >= length) break;
+                    
+                    const element = createCard(member[index], index);
+                    const object = new THREE.CSS3DObject(element);
+                    object.position.x = Math.random() * 4000 - 2000;
+                    object.position.y = Math.random() * 4000 - 2000;
+                    object.position.z = Math.random() * 4000 - 2000;
+                    scene.add(object);
+                    threeDCards.push(object);
+
+                    const target = new THREE.Object3D();
+                    target.position.x = j * 140 - position.x;
+                    target.position.y = -(i * 180) + position.y;
+                    targets.table.push(target);
+                    index++;
+                }
+            }
+
+            TOTAL_CARDS = threeDCards.length;
+
+            // sphere formation
+            for (let i = 0; i < TOTAL_CARDS; i++) {
+                const phi = Math.acos(-1 + (2 * i) / TOTAL_CARDS);
+                const theta = Math.sqrt(TOTAL_CARDS * Math.PI) * phi;
+                const object = new THREE.Object3D();
+                object.position.setFromSphericalCoords(800, phi, theta);
+                const vector = object.position.clone().multiplyScalar(2);
+                object.lookAt(vector);
+                targets.sphere.push(object);
+            }
+
+            renderer = new THREE.CSS3DRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById("container").appendChild(renderer.domElement);
+
+            controls = new THREE.TrackballControls(camera, renderer.domElement);
+            controls.rotateSpeed = 0.5;
+            controls.minDistance = 500;
+            controls.maxDistance = 6000;
+            controls.addEventListener("change", render);
+
+            bindEvent();
+            transform(targets.sphere, 2000);
+        }
+
+        function createCard(name, id) {
+            const element = document.createElement("div");
+            element.className = "element";
+            element.id = "card-" + id;
+            
+            const nameEl = document.createElement("div");
+            nameEl.className = "name";
+            nameEl.textContent = name;
+            element.appendChild(nameEl);
+            
+            return element;
+        }
+
+        function bindEvent() {
+            btns.lottery.addEventListener("click", function() {
+                if (isLotting) {
+                    // 停止抽奖
+                    rotateObj.stop();
+                    btns.lottery.innerHTML = "开始抽奖";
+                    return;
+                }
+
+                const selectCount = parseInt(btns.countSelect.value);
+                if (selectCount > basicData.leftUsers.length) {
+                    addQipao(`剩余人数不足${selectCount}人！`);
+                    return;
+                }
+
+                setLotteryStatus(true);
+                btns.lottery.innerHTML = "停止";
+                addQipao(`正在抽取${selectCount}人，准备好运气！`);
+                
+                resetCard().then(() => {
+                    lottery(selectCount);
+                });
+            });
+
+            window.addEventListener("resize", onWindowResize, false);
+        }
+
+        function setLotteryStatus(status) {
+            isLotting = status;
+        }
+
+        function transform(targets, duration) {
+            for (let i = 0; i < threeDCards.length; i++) {
+                const object = threeDCards[i];
+                const target = targets[i];
+
+                new TWEEN.Tween(object.position)
+                    .to({
+                        x: target.position.x,
+                        y: target.position.y,
+                        z: target.position.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+
+                new TWEEN.Tween(object.rotation)
+                    .to({
+                        x: target.rotation.x,
+                        y: target.rotation.y,
+                        z: target.rotation.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+            }
+
+            new TWEEN.Tween(this)
+                .to({}, duration * 2)
+                .onUpdate(render)
+                .start();
+        }
+
+        function rotateBall() {
+            return new Promise((resolve) => {
+                scene.rotation.y = 0;
+                rotateObj = new TWEEN.Tween(scene.rotation);
+                rotateObj
+                    .to({ y: Math.PI * 6 }, ROTATE_TIME)
+                    .onUpdate(render)
+                    .start()
+                    .onStop(() => {
+                        scene.rotation.y = 0;
+                        resolve();
+                    })
+                    .onComplete(() => {
+                        resolve();
+                    });
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+        }
+
+        function render() {
+            renderer.render(scene, camera);
+        }
+
+        function lottery(perCount) {
+            rotateBall().then(() => {
+                currentLuckys = [];
+                selectedCardIndex = [];
+
+                for (let i = 0; i < perCount; i++) {
+                    const luckyIndex = Math.floor(Math.random() * basicData.leftUsers.length);
+                    currentLuckys.push(basicData.leftUsers[luckyIndex]);
+                    basicData.leftUsers.splice(luckyIndex, 1);
+
+                    const cardIndex = i % TOTAL_CARDS;
+                    selectedCardIndex.push(cardIndex);
+                }
+
+                basicData.usedNames = basicData.usedNames.concat(currentLuckys);
+                saveToStorage();
+                updateCountDisplay();
+                
+                addQipao(`🎉 恭喜 ${currentLuckys.join('、')}！`);
+                selectCard();
+            });
+        }
+
+        function selectCard(duration = 600) {
+            const width = 140;
+            let tag = -(currentLuckys.length - 1) / 2;
+            const locates = [];
+
+            for (let i = 0; i < currentLuckys.length; i++) {
+                locates.push({
+                    x: tag * width,
+                    y: 0
+                });
+                tag++;
+            }
+
+            selectedCardIndex.forEach((cardIndex, index) => {
+                const object = threeDCards[cardIndex];
+                new TWEEN.Tween(object.position)
+                    .to({
+                        x: locates[index].x,
+                        y: locates[index].y,
+                        z: 2000
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+
+                new TWEEN.Tween(object.rotation)
+                    .to({ x: 0, y: 0, z: 0 }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+
+                object.element.classList.add('prize');
+            });
+
+            new TWEEN.Tween(this)
+                .to({}, duration * 2)
+                .onUpdate(render)
+                .start()
+                .onComplete(() => {
+                    setLotteryStatus(false);
+                    btns.lottery.innerHTML = "再次抽取";
+                });
+        }
+
+        function resetCard(duration = 500) {
+            if (currentLuckys.length === 0) {
+                return Promise.resolve();
+            }
+
+            selectedCardIndex.forEach(index => {
+                const object = threeDCards[index];
+                const target = targets.sphere[index];
+
+                new TWEEN.Tween(object.position)
+                    .to({
+                        x: target.position.x,
+                        y: target.position.y,
+                        z: target.position.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+
+                new TWEEN.Tween(object.rotation)
+                    .to({
+                        x: target.rotation.x,
+                        y: target.rotation.y,
+                        z: target.rotation.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+            });
+
+            return new Promise((resolve) => {
+                new TWEEN.Tween(this)
+                    .to({}, duration * 2)
+                    .onUpdate(render)
+                    .start()
+                    .onComplete(() => {
+                        selectedCardIndex.forEach(index => {
+                            threeDCards[index].element.classList.remove('prize');
+                        });
+                        resolve();
+                    });
+            });
+        }
+
+        function shineCard() {
+            setInterval(() => {
+                if (isLotting) return;
+                if (basicData.leftUsers.length === 0) return;
+                
+                const randomIndex = Math.floor(Math.random() * TOTAL_CARDS);
+                const card = threeDCards[randomIndex];
+                if (card && !selectedCardIndex.includes(randomIndex)) {
+                    const hue = Math.random() * 0.5 + 0.5;
+                    card.element.style.backgroundColor = `rgba(0, 127, 127, ${Math.random() * 0.5 + 0.5})`;
+                }
+            }, 500);
+        }
+
+        // 气泡提示
+        let qipaoList = [];
+        function addQipao(text) {
+            let qipao;
+            if (qipaoList.length > 0) {
+                qipao = qipaoList.shift();
+            } else {
+                qipao = document.createElement("div");
+                qipao.className = "qipao";
+                document.querySelector(".qipao-container").appendChild(qipao);
+            }
+            
+            qipao.textContent = text;
+            qipao.style.animation = 'none';
+            qipao.offsetHeight;
+            qipao.style.animation = 'slideIn 0.3s ease-out';
+            
+            setTimeout(() => {
+                qipaoList.push(qipao);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
