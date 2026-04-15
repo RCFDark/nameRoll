@@ -9,9 +9,8 @@ const state = {
     history: [],                  // 抽取历史
     mode: 'scroll',               // 抽取模式: scroll/wheel
     count: 1,                     // 抽取人数
-    noRepeat: false,              // 是否去除重复
     isDrawing: false,             // 正在抽取中
-    usedNames: []                 // 已抽取过的名字(用于去除重复)
+    drawnNames: []                // 当前会话已抽取的名字(用于去除重复)
 };
 
 // ===== DOM 元素 =====
@@ -25,7 +24,6 @@ const elements = {
     countBtns: document.querySelectorAll('.count-btn'),
     customCountSection: document.getElementById('customCountSection'),
     customCount: document.getElementById('customCount'),
-    noRepeat: document.getElementById('noRepeat'),
     drawBtn: document.getElementById('drawBtn'),
     historyList: document.getElementById('historyList'),
     clearHistory: document.getElementById('clearHistory'),
@@ -38,7 +36,6 @@ const elements = {
 // ===== 常量 =====
 const STORAGE_KEY_NAMES = 'nameRoll_names';
 const STORAGE_KEY_HISTORY = 'nameRoll_history';
-const STORAGE_KEY_USED = 'nameRoll_usedNames';
 
 // ===== 初始化 =====
 function init() {
@@ -71,15 +68,6 @@ function bindEvents() {
         val = Math.max(1, Math.min(10, val));
         elements.customCount.value = val;
         state.count = val;
-    });
-    
-    // 去除重复开关
-    elements.noRepeat.addEventListener('change', () => {
-        state.noRepeat = elements.noRepeat.checked;
-        if (!state.noRepeat) {
-            state.usedNames = [];
-            saveToStorage();
-        }
     });
     
     // 开始抽取
@@ -121,7 +109,7 @@ function handleFileSelect(e) {
             }
             
             state.names = names;
-            state.usedNames = []; // 重置已使用名单
+            state.drawnNames = [];
             saveToStorage();
             render();
             
@@ -136,35 +124,83 @@ function handleFileSelect(e) {
 
 /**
  * 从Excel数据中提取名字
- * 自动识别第一行有数据的列
+ * 自动识别名字列：优先找表头含"姓名/name/名/学生"的列
+ * 否则检测哪一列包含更多常见姓氏
  */
 function extractNames(data) {
     if (!data || data.length === 0) return [];
     
-    // 找到非空的列索引
-    let nameColIndex = 0;
-    const firstRow = data[0];
+    // 常见姓氏列表（按使用频率排序，取前100个）
+    const commonSurnames = [
+        '王','李','张','刘','陈','杨','赵','黄','周','吴','徐','孙','胡','朱','高','林','何','郭','马','罗',
+        '梁','宋','郑','谢','韩','唐','冯','于','董','萧','程','曹','袁','邓','许','傅','沈','曾','彭','吕',
+        '苏','卢','蒋','蔡','贾','丁','魏','薛','叶','阎','余','潘','杜','戴','钟','汪','田','邱','侯','邵',
+        '孟','白','龙','江','阎','段','雷','钱','汤','尹','黎','易','常','武','乔','贺','赖','龚','文','危',
+        '颜','梅','耿','甄','曲','封','芮','羿','储','井','蒲','邬','查','纪','舒','巫','虞','辛','冉','孔',
+        '俞','任','袁','柳','史','唐','费','薛','汤','王','方','邹','石','崔','吉','聂','姜','汪','苏','傅'
+    ];
+    const surnameSet = new Set(commonSurnames);
     
-    // 查找第一个非空列
-    for (let i = 0; i < firstRow.length; i++) {
-        if (firstRow[i] !== undefined && firstRow[i] !== null && String(firstRow[i]).trim() !== '') {
+    const nameKeywords = ['姓名', 'name', '名字', '学生', '人员', '成员'];
+    let nameColIndex = -1;
+    
+    // 步骤1: 从表头查找名字列
+    const headerRow = data[0];
+    for (let i = 0; i < headerRow.length; i++) {
+        const header = String(headerRow[i] || '').toLowerCase();
+        if (nameKeywords.some(kw => header.includes(kw.toLowerCase()))) {
             nameColIndex = i;
+            console.log('从表头识别到名字列:', i, headerRow[i]);
             break;
         }
     }
     
-    // 提取该列的所有非空名字
+    // 步骤2: 如果没找到，检测各列包含的姓氏数量
+    if (nameColIndex === -1 && data.length > 2) {
+        let maxScore = 0;
+        const colCount = data[0].length;
+        
+        for (let col = 0; col < colCount; col++) {
+            let score = 0;
+            // 检查前10行数据，看有多少是常见姓氏开头
+            for (let row = 1; row < Math.min(data.length, 15); row++) {
+                const cell = data[row] && data[row][col];
+                if (cell) {
+                    const name = String(cell).trim();
+                    if (name && surnameSet.has(name[0])) {
+                        score++;
+                    }
+                }
+            }
+            if (score > maxScore) {
+                maxScore = score;
+                nameColIndex = col;
+            }
+        }
+        if (nameColIndex !== -1) {
+            console.log('从姓氏检测识别到名字列:', nameColIndex, '得分:', maxScore);
+        }
+    }
+    
+    // 没识别到，弹窗报错
+    if (nameColIndex === -1) {
+        alert('无法自动识别名字列！\n\n请确保Excel满足以下条件之一：\n1. 第一行表头包含"姓名"、"name"、"学生"等关键词\n2. 名单列包含常见姓氏（如张、王、李等）');
+        return [];
+    }
+    
+    // 提取该列的所有非空名字（从第2行开始，跳过表头）
     const names = [];
-    for (let i = 1; i < data.length; i++) { // 从第2行开始，跳过表头
-        const cell = data[i];
-        if (cell && cell[nameColIndex] !== undefined && cell[nameColIndex] !== null) {
-            const name = String(cell[nameColIndex]).trim();
+    for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (row && row[nameColIndex] !== undefined && row[nameColIndex] !== null) {
+            const name = String(row[nameColIndex]).trim();
             if (name) {
                 names.push(name);
             }
         }
     }
     
+    console.log('最终识别到的名字列索引:', nameColIndex, '人数:', names.length);
     return names;
 }
 
@@ -194,14 +230,11 @@ function selectCount(btn) {
 function startDraw() {
     if (state.isDrawing) return;
     
-    // 验证名单
-    let availableNames = state.names;
-    if (state.noRepeat) {
-        availableNames = state.names.filter(n => !state.usedNames.includes(n));
-    }
+    // 验证名单（默认去重：当前会话已抽取的不再抽）
+    let availableNames = state.names.filter(n => !state.drawnNames.includes(n));
     
     if (availableNames.length === 0) {
-        alert('名单为空或所有名字都已抽取过！');
+        alert('所有名字都已抽取过！请点击"清除历史"重置。');
         return;
     }
     
@@ -296,6 +329,9 @@ function wheelDraw(availableNames) {
     
     // 动画结束后显示结果
     setTimeout(() => {
+        // 播放恭喜音效
+        playSuccessSound();
+        
         state.isDrawing = false;
         elements.drawBtn.disabled = false;
         elements.drawBtn.innerHTML = '<i class="fas fa-hand-pointer"></i> 开始抽取';
@@ -305,10 +341,8 @@ function wheelDraw(availableNames) {
         
         addToHistory(results);
         
-        if (state.noRepeat) {
-            state.usedNames.push(...results);
-            saveToStorage();
-        }
+        // 记录已抽取的名字（当前会话去重）
+        state.drawnNames.push(...results);
     }, 3500);
 }
 
@@ -408,11 +442,8 @@ function finalizeDraw(availableNames) {
     // 记录到历史
     addToHistory(results);
     
-    // 更新已使用名单
-    if (state.noRepeat) {
-        state.usedNames.push(...results);
-        saveToStorage();
-    }
+    // 记录已抽取的名字（当前会话去重）
+    state.drawnNames.push(...results);
     
     // 清理滚动容器
     const scrollContainer = document.querySelector('.scroll-container');
@@ -465,7 +496,9 @@ function addToHistory(results) {
 function clearHistory() {
     if (confirm('确定要清空所有抽取历史吗？')) {
         state.history = [];
+        state.drawnNames = [];
         saveToStorage();
+        render();
         renderHistory();
     }
 }
@@ -475,7 +508,6 @@ function saveToStorage() {
     try {
         localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
         localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(state.history));
-        localStorage.setItem(STORAGE_KEY_USED, JSON.stringify(state.usedNames));
     } catch (e) {
         console.error('保存到localStorage失败:', e);
     }
@@ -485,11 +517,9 @@ function loadFromStorage() {
     try {
         const names = localStorage.getItem(STORAGE_KEY_NAMES);
         const history = localStorage.getItem(STORAGE_KEY_HISTORY);
-        const usedNames = localStorage.getItem(STORAGE_KEY_USED);
         
         if (names) state.names = JSON.parse(names);
         if (history) state.history = JSON.parse(history);
-        if (usedNames) state.usedNames = JSON.parse(usedNames);
     } catch (e) {
         console.error('从localStorage加载失败:', e);
     }
@@ -498,7 +528,7 @@ function loadFromStorage() {
 function clearNames() {
     if (confirm('确定要清空所有名单吗？')) {
         state.names = [];
-        state.usedNames = [];
+        state.drawnNames = [];
         elements.fileName.textContent = '未选择文件';
         saveToStorage();
         render();
@@ -525,10 +555,10 @@ function renderNameList() {
     }
     
     elements.nameList.innerHTML = state.names.map((name, index) => {
-        const isUsed = state.usedNames.includes(name);
-        return `<div class="name-item" style="${isUsed ? 'opacity: 0.5;' : ''}">
+        const isDrawn = state.drawnNames.includes(name);
+        return `<div class="name-item" style="${isDrawn ? 'opacity: 0.5;' : ''}">
             ${escapeHtml(name)}
-            ${isUsed ? '✓' : ''}
+            ${isDrawn ? '✓' : ''}
         </div>`;
     }).join('');
 }
@@ -617,7 +647,7 @@ function playSpinSound() {
         oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
         oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
         
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.6, audioContext.currentTime); // 音量调大
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
         
         oscillator.start(audioContext.currentTime);

@@ -24,7 +24,9 @@
         #container {
             z-index: 3;
             position: relative;
-            margin: 0 15vh;
+            width: 100%;
+            height: 100vh;
+            margin: 0 auto;
         }
 
         #menu {
@@ -123,8 +125,8 @@
         }
 
         .element {
-            width: 120px;
-            height: 150px;
+            width: 80px;
+            height: 100px;
             background: rgba(0, 127, 127, 0.6);
             box-shadow: 0 0 10px rgba(3, 233, 244, 0.3);
             border: 1px solid rgba(3, 233, 244, 0.2);
@@ -139,7 +141,7 @@
         }
 
         .element .name {
-            font-size: 22px;
+            font-size: 14px;
             font-weight: bold;
             color: rgba(255, 255, 255, 0.9);
             text-shadow: 0 0 8px rgba(3, 233, 244, 0.8);
@@ -187,8 +189,20 @@
             top: 20px;
             right: 20px;
             z-index: 10;
-            padding: 10px 20px;
-            font-size: 14px;
+            padding: 12px 25px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 25px;
+            font-weight: bold;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
 
         .used-count {
@@ -234,7 +248,7 @@
     </div>
 
     <a href="../index.html" class="back-btn">
-        ← 返回主页
+        🏠 返回主页
     </a>
 
     <div class="qipao-container"></div>
@@ -249,7 +263,6 @@
         const ROW_COUNT = 7;
         const COLUMN_COUNT = 17;
         const STORAGE_KEY_NAMES = 'nameRoll_names';
-        const STORAGE_KEY_USED = 'nameRoll_usedNames';
         const ROTATE_TIME = 3000;
 
         let TOTAL_CARDS;
@@ -260,10 +273,10 @@
         let isLotting = false;
         let currentLuckys = [];
         let selectedCardIndex = [];
+        let drawnNames = [];
         let basicData = {
             users: [],
-            leftUsers: [],
-            usedNames: []
+            leftUsers: []
         };
 
         const btns = {
@@ -290,31 +303,29 @@
         function loadFromStorage() {
             try {
                 const names = localStorage.getItem(STORAGE_KEY_NAMES);
-                const usedNames = localStorage.getItem(STORAGE_KEY_USED);
                 
                 if (names) {
                     basicData.users = JSON.parse(names);
                 }
-                if (usedNames) {
-                    basicData.usedNames = JSON.parse(usedNames);
-                }
-                basicData.leftUsers = basicData.users.filter(name => !basicData.usedNames.includes(name));
+                // 只从名单中过滤当前会话已抽取的
+                basicData.leftUsers = basicData.users.filter(name => !drawnNames.includes(name));
             } catch (e) {
                 console.error('加载数据失败:', e);
             }
         }
 
-        function saveToStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY_USED, JSON.stringify(basicData.usedNames));
-            } catch (e) {
-                console.error('保存数据失败:', e);
-            }
+        function updateCountDisplay() {
+            // 刷新剩余人数（从原始名单中过滤已抽取的）
+            basicData.leftUsers = basicData.users.filter(name => !drawnNames.includes(name));
+            document.getElementById('leftCount').textContent = basicData.leftUsers.length;
+            document.getElementById('usedCount').textContent = drawnNames.length;
         }
 
         function updateCountDisplay() {
+            // 刷新剩余人数
+            basicData.leftUsers = basicData.users.filter(name => !drawnNames.includes(name));
             document.getElementById('leftCount').textContent = basicData.leftUsers.length;
-            document.getElementById('usedCount').textContent = basicData.usedNames.length;
+            document.getElementById('usedCount').textContent = drawnNames.length;
         }
 
         function initCards() {
@@ -328,14 +339,15 @@
 
             const totalMember = member.length;
             const position = {
-                x: (140 * COLUMN_COUNT - 20) / 2,
-                y: (180 * ROW_COUNT - 20) / 2
+                x: (100 * COLUMN_COUNT - 20) / 2,
+                y: (120 * ROW_COUNT - 20) / 2
             };
 
             camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
-            camera.position.z = 3000;
+            camera.position.set(0, 0, 2000);
 
             scene = new THREE.Scene();
+            scene.rotation.y = 0;
 
             let index = 0;
             for (let i = 0; i < ROW_COUNT; i++) {
@@ -344,15 +356,15 @@
                     
                     const element = createCard(member[index], index);
                     const object = new THREE.CSS3DObject(element);
-                    object.position.x = Math.random() * 4000 - 2000;
-                    object.position.y = Math.random() * 4000 - 2000;
-                    object.position.z = Math.random() * 4000 - 2000;
+                    object.position.x = Math.random() * 2000 - 1000;
+                    object.position.y = Math.random() * 2000 - 1000;
+                    object.position.z = Math.random() * 2000 - 1000;
                     scene.add(object);
                     threeDCards.push(object);
 
                     const target = new THREE.Object3D();
-                    target.position.x = j * 140 - position.x;
-                    target.position.y = -(i * 180) + position.y;
+                    target.position.x = j * 100 - position.x;
+                    target.position.y = -(i * 120) + position.y;
                     targets.table.push(target);
                     index++;
                 }
@@ -360,12 +372,13 @@
 
             TOTAL_CARDS = threeDCards.length;
 
-            // sphere formation
+            // sphere formation - 根据人数调整半径
+            const sphereRadius = Math.max(400, Math.sqrt(TOTAL_CARDS) * 80);
             for (let i = 0; i < TOTAL_CARDS; i++) {
                 const phi = Math.acos(-1 + (2 * i) / TOTAL_CARDS);
                 const theta = Math.sqrt(TOTAL_CARDS * Math.PI) * phi;
                 const object = new THREE.Object3D();
-                object.position.setFromSphericalCoords(800, phi, theta);
+                object.position.setFromSphericalCoords(sphereRadius, phi, theta);
                 const vector = object.position.clone().multiplyScalar(2);
                 object.lookAt(vector);
                 targets.sphere.push(object);
@@ -416,6 +429,9 @@
                 setLotteryStatus(true);
                 btns.lottery.innerHTML = "停止";
                 addQipao(`正在抽取${selectCount}人，准备好运气！`);
+                
+                // 播放转动音效
+                playSpinSound();
                 
                 resetCard().then(() => {
                     lottery(selectCount);
@@ -504,13 +520,20 @@
                     currentLuckys.push(basicData.leftUsers[luckyIndex]);
                     basicData.leftUsers.splice(luckyIndex, 1);
 
-                    const cardIndex = i % TOTAL_CARDS;
+                    // 随机一个不重复的位置
+                    let cardIndex;
+                    do {
+                        cardIndex = Math.floor(Math.random() * TOTAL_CARDS);
+                    } while (selectedCardIndex.includes(cardIndex));
                     selectedCardIndex.push(cardIndex);
                 }
 
-                basicData.usedNames = basicData.usedNames.concat(currentLuckys);
-                saveToStorage();
+                // 记录已抽取的名字
+                drawnNames = drawnNames.concat(currentLuckys);
                 updateCountDisplay();
+                
+                // 播放恭喜音效
+                playSuccessSound();
                 
                 addQipao(`🎉 恭喜 ${currentLuckys.join('、')}！`);
                 selectCard();
@@ -518,25 +541,40 @@
         }
 
         function selectCard(duration = 600) {
-            const width = 140;
-            let tag = -(currentLuckys.length - 1) / 2;
+            const width = 100;
+            const maxPerRow = 5;
+            const rowHeight = 120;
             const locates = [];
 
+            // 计算总行数，用于整体居中
+            const totalRows = Math.ceil(currentLuckys.length / maxPerRow);
+            const totalHeight = (totalRows - 1) * rowHeight;
+            const startY = totalHeight / 2;
+
+            // 计算每行的位置，每行单独居中
             for (let i = 0; i < currentLuckys.length; i++) {
+                const row = Math.floor(i / maxPerRow);
+                const col = i % maxPerRow;
+                const itemsInThisRow = Math.min(maxPerRow, currentLuckys.length - row * maxPerRow);
+                const startX = -(itemsInThisRow - 1) / 2 * width;
+                
                 locates.push({
-                    x: tag * width,
-                    y: 0
+                    x: startX + col * width,
+                    y: startY - row * rowHeight
                 });
-                tag++;
             }
 
             selectedCardIndex.forEach((cardIndex, index) => {
                 const object = threeDCards[cardIndex];
+                
+                // 更新卡片名字为被抽中的人
+                object.element.querySelector('.name').textContent = currentLuckys[index];
+                
                 new TWEEN.Tween(object.position)
                     .to({
                         x: locates[index].x,
                         y: locates[index].y,
-                        z: 2000
+                        z: 1500
                     }, Math.random() * duration + duration)
                     .easing(TWEEN.Easing.Exponential.InOut)
                     .start();
@@ -635,6 +673,60 @@
             setTimeout(() => {
                 qipaoList.push(qipao);
             }, 3000);
+        }
+
+        // ===== 音效 =====
+        function playSpinSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.6, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (e) {
+                console.log('音效播放失败');
+            }
+        }
+
+        function playSuccessSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 播放两遍，模拟"恭喜恭喜"
+                for (let i = 0; i < 2; i++) {
+                    setTimeout(() => {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(523, audioContext.currentTime); // C5
+                        oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.15); // E5
+                        oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.3); // G5
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.4);
+                    }, i * 200);
+                }
+            } catch (e) {
+                console.log('音效播放失败');
+            }
         }
     </script>
 </body>
